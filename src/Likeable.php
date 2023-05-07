@@ -8,7 +8,7 @@ use Illuminate\Support\Collection;
 /**
  * Copyright (C) 2014 Robert Conner
  *
- * @method static Builder whereLikedBy($userId=null)
+ * @method static Builder whereLikedBy($userId = null)
  * @property Collection|Like[] likes
  * @property Liked liked
  * @property integer likeCount
@@ -24,7 +24,7 @@ trait Likeable
             });
         }
     }
-    
+
     /**
      * Populate the $model->likes attribute
      */
@@ -37,69 +37,86 @@ trait Likeable
      * Add a like for this record by the given user.
      * @param $userId mixed - If null will use currently logged in user.
      */
-    public function like($userId=null)
+    public function like($userId = null)
     {
+        $send = false;
+
         if (is_null($userId)) {
             $userId = $this->loggedInUserId();
         }
-        
+
         if ($userId) {
             $like = $this->likes()
                 ->where('user_id', '=', $userId)
                 ->first();
-    
-            if ($like) {
-                return;
+
+            if (isset($like)) {
+                if ($like->status == 1) {
+                    return false;
+                } else {
+                    $like->status = 1;
+                    $like->save();
+                    $send = false;
+                }
+            } else {
+                $like = new Like();
+                $like->user_id = $userId;
+                $like->status = 1;
+                $this->likes()->save($like);
+                $send = true;
             }
-    
-            $like = new Like();
-            $like->user_id = $userId;
-            $this->likes()->save($like);
+
         }
 
         $this->incrementLikeCount();
+
+        return $send;
     }
 
     /**
      * Remove a like from this record for the given user.
      * @param $userId mixed - If null will use currently logged in user.
      */
-    public function unlike($userId=null)
+    public function unlike($userId = null)
     {
         if (is_null($userId)) {
             $userId = $this->loggedInUserId();
         }
-        
+
         if ($userId) {
             $like = $this->likes()
                 ->where('user_id', '=', $userId)
                 ->first();
-    
-            if ($like) {
-                $like->delete();
+
+            if (isset($like)) {
+                if ($like->status == 1) {
+                    $like->status = 0;
+                    $like->save();
+
+                    $this->decrementLikeCount();
+                }
             }
         }
 
-        $this->decrementLikeCount();
     }
-    
+
     /**
      * Has the currently logged in user already "liked" the current object
      *
      * @param string $userId
      * @return boolean
      */
-    public function liked($userId=null)
+    public function liked($userId = null)
     {
         if (is_null($userId)) {
             $userId = $this->loggedInUserId();
         }
-        
-        return (bool) $this->likes()
+
+        return (bool)$this->likes()
             ->where('user_id', '=', $userId)
             ->count();
     }
-    
+
     /**
      * Should remove likes on model row delete (defaults to true)
      * public static removeLikesOnDelete = false;
@@ -110,7 +127,7 @@ trait Likeable
             ? static::$removeLikesOnDelete
             : true;
     }
-    
+
     /**
      * Delete likes related to the current record
      */
@@ -177,11 +194,10 @@ trait Likeable
 
         if ($counter) {
             $counter->count--;
-            if( $counter->count < 0) {
-                $counter->count = 0;
-            }
             if ($counter->count) {
                 $counter->save();
+            } else {
+                $counter->delete();
             }
         }
     }
@@ -192,7 +208,7 @@ trait Likeable
      * Ex: Book::whereLikedBy(123)->get();
      * @access private
      */
-    public function scopeWhereLikedBy($query, $userId=null)
+    public function scopeWhereLikedBy($query, $userId = null)
     {
         if (is_null($userId)) {
             $userId = $this->loggedInUserId();

@@ -32,16 +32,17 @@ class LikeCounter extends Eloquent
         if (empty($modelClass)) {
             throw new \Exception('$modelClass cannot be empty/null. Maybe set the $morphClass variable on your model.');
         }
-        
+
         $builder = Like::query()
             ->select(\DB::raw('count(*) as count, likeable_type, likeable_id'))
             ->where('likeable_type', $modelClass)
+            ->where('status', 1)
             ->groupBy('likeable_id');
-        
+
         $results = $builder->get();
-        
+
         $inserts = $results->toArray();
-        
+
         \DB::table((new static)->table)->insert($inserts);
     }
 }
