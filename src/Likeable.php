@@ -75,11 +75,9 @@ trait Likeable
                 ->where('user_id', '=', $userId)
                 ->first();
     
-            if (!$like) {
-                return;
+            if ($like) {
+                $like->delete();
             }
-    
-            $like->delete();
         }
 
         $this->decrementLikeCount();
